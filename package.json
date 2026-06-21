@@ -1,17 +1,14 @@
 {
-  "name": "privacy-guard",
-  "version": "0.2.0",
-  "description": "Privacy Guard — Anti-Fingerprint & Privacy Score (Chrome MV3)",
+  "name": "ext-suite",
+  "version": "0.1.0",
   "private": true,
-  "type": "module",
+  "description": "A suite of privacy-focused Chrome MV3 extensions.",
+  "workspaces": [
+    "apps/*"
+  ],
   "scripts": {
-    "build": "node build.mjs",
-    "watch": "node build.mjs --watch",
-    "typecheck": "tsc --noEmit"
-  },
-  "devDependencies": {
-    "@types/chrome": "^0.0.270",
-    "typescript": "^5.6.3",
-    "vite": "^5.4.10"
+    "build": "npm run build --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "build:privacy-guard": "npm run build -w @ext-suite/privacy-guard"
   }
 }
