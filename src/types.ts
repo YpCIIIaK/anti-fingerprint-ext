@@ -3,6 +3,12 @@
 export type StrictnessLevel = 'off' | 'balanced' | 'strict';
 
 export interface Settings {
+  /**
+   * Global master switch. When false, ALL protection is paused everywhere
+   * (spoofing + tracker blocking) without clearing any saved state — history,
+   * allowlist, per-site exceptions and level are all preserved.
+   */
+  enabled: boolean;
   level: StrictnessLevel;
   /** Origins where spoofing is fully disabled. */
   allowlist: string[];
@@ -15,6 +21,7 @@ export interface Settings {
 }
 
 export const DEFAULT_SETTINGS: Settings = {
+  enabled: true,
   level: 'balanced',
   allowlist: [],
   perSiteAllow: {},
@@ -78,4 +85,6 @@ export type RuntimeMessage =
   | { type: 'set-settings'; settings: Settings }
   | { type: 'get-history' }
   | { type: 'clear-history' }
+  | { type: 'get-stats' }
+  | { type: 'clear-stats' }
   | { type: 'set-tracker-exception'; siteHost: string; domain: string; allow: boolean };

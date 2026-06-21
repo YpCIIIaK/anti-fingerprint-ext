@@ -77,6 +77,45 @@ async function renderHistory(): Promise<void> {
   }
 }
 
+interface Stats {
+  trackersBlockedTotal: number;
+  fpProbesTotal: number;
+  topTrackers: Record<string, number>;
+  sitesProtected: number;
+  since: number;
+}
+
+async function renderStats(): Promise<void> {
+  const s = (await chrome.runtime.sendMessage({ type: 'get-stats' })) as Stats;
+  $('stTrackers').textContent = s.trackersBlockedTotal.toLocaleString();
+  $('stProbes').textContent = s.fpProbesTotal.toLocaleString();
+  $('stSites').textContent = s.sitesProtected.toLocaleString();
+  $('stSince').textContent = `Since ${new Date(s.since).toLocaleDateString()}`;
+
+  const top = Object.entries(s.topTrackers)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 8);
+  const max = top[0]?.[1] ?? 1;
+  const list = $('topTrackers');
+  list.innerHTML = '';
+  if (top.length === 0) {
+    list.innerHTML = '<li class="empty">No trackers blocked yet.</li>';
+    return;
+  }
+  for (const [domain, count] of top) {
+    const li = document.createElement('li');
+    li.innerHTML =
+      `<div class="row"><span class="name" title="${domain}">${domain}</span><span>${count}</span></div>` +
+      `<div class="track"><div class="fill" style="width:${Math.round((count / max) * 100)}%"></div></div>`;
+    list.appendChild(li);
+  }
+}
+
+$('clearStats').addEventListener('click', async () => {
+  await chrome.runtime.sendMessage({ type: 'clear-stats' });
+  renderStats();
+});
+
 $('clearHistory').addEventListener('click', async () => {
   await chrome.runtime.sendMessage({ type: 'clear-history' });
   renderHistory();
@@ -104,3 +143,4 @@ $('add').addEventListener('click', async () => {
 
 render();
 renderHistory();
+renderStats();

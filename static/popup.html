@@ -8,9 +8,19 @@
   </head>
   <body>
     <header>
-      <div class="brand">Privacy Guard</div>
+      <div class="brand-row">
+        <div class="brand">Privacy Guard</div>
+        <label class="switch master" title="Pause/resume all protection">
+          <input type="checkbox" id="masterToggle" />
+          <span class="slider"></span>
+        </label>
+      </div>
       <div id="origin" class="origin">—</div>
     </header>
+
+    <div id="pausedBanner" class="paused-banner" hidden>
+      Protection paused globally — nothing is being spoofed or blocked.
+    </div>
 
     <section class="score">
       <div id="grade" class="grade grade--na">–</div>
@@ -18,6 +28,12 @@
         <div id="scoreNum" class="score-num">—</div>
         <div class="score-label">Privacy Score</div>
       </div>
+    </section>
+
+    <section class="chips">
+      <div class="chip"><span id="chProbes" class="chip-num">0</span><span class="chip-label">FP probes</span></div>
+      <div class="chip"><span id="chBlocked" class="chip-num">0</span><span class="chip-label">Blocked here</span></div>
+      <div class="chip"><span id="chHttps" class="chip-num">—</span><span class="chip-label">Transport</span></div>
     </section>
 
     <section class="controls">

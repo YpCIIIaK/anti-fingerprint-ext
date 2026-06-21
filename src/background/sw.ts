@@ -15,7 +15,31 @@ import { computeScore } from '../core/score';
 const SALT_KEY = 'pg_session_salt';
 const SETTINGS_KEY = 'pg_settings';
 const HISTORY_KEY = 'pg_history';
+const STATS_KEY = 'pg_stats';
 const tabKey = (id: number) => `pg_tab_${id}`;
+
+/** Lifetime aggregate metrics shown on the dashboard. */
+interface GlobalStats {
+  trackersBlockedTotal: number;
+  fpProbesTotal: number;
+  topTrackers: Record<string, number>;
+  since: number;
+}
+
+function emptyStats(): GlobalStats {
+  return { trackersBlockedTotal: 0, fpProbesTotal: 0, topTrackers: {}, since: Date.now() };
+}
+
+async function getStats(): Promise<GlobalStats> {
+  const got = await chrome.storage.local.get(STATS_KEY);
+  return { ...emptyStats(), ...(got[STATS_KEY] as GlobalStats | undefined) };
+}
+
+async function updateStats(fn: (s: GlobalStats) => void): Promise<void> {
+  const stats = await getStats();
+  fn(stats);
+  await chrome.storage.local.set({ [STATS_KEY]: stats });
+}
 
 /** Per-origin history record shown in Options. */
 interface HistoryEntry {
@@ -48,6 +72,19 @@ async function getSettings(): Promise<Settings> {
 
 async function setSettings(s: Settings): Promise<void> {
   await chrome.storage.local.set({ [SETTINGS_KEY]: s });
+}
+
+// Enable/disable the static tracker ruleset to honour the global master switch.
+async function applyTrackerBlocking(settings: Settings): Promise<void> {
+  try {
+    await chrome.declarativeNetRequest.updateEnabledRulesets(
+      settings.enabled
+        ? { enableRulesetIds: ['trackers'] }
+        : { disableRulesetIds: ['trackers'] }
+    );
+  } catch {
+    /* ruleset already in desired state */
+  }
 }
 
 function isAllowlisted(settings: Settings, origin: string): boolean {
@@ -84,8 +121,13 @@ async function syncDynamicRules(settings: Settings): Promise<void> {
 }
 
 // Keep dynamic rules in sync with settings across SW restarts.
-chrome.runtime.onStartup.addListener(async () => syncDynamicRules(await getSettings()));
-chrome.runtime.onInstalled.addListener(async () => syncDynamicRules(await getSettings()));
+async function applyGlobalState(): Promise<void> {
+  const settings = await getSettings();
+  await syncDynamicRules(settings);
+  await applyTrackerBlocking(settings);
+}
+chrome.runtime.onStartup.addListener(applyGlobalState);
+chrome.runtime.onInstalled.addListener(applyGlobalState);
 
 // ---- per-tab signal state -----------------------------------------------
 
@@ -163,6 +205,13 @@ async function bumpVisit(origin: string): Promise<void> {
 // ---- badge ---------------------------------------------------------------
 
 async function refreshBadge(tabId: number): Promise<void> {
+  const settings = await getSettings();
+  if (!settings.enabled) {
+    await chrome.action.setBadgeBackgroundColor({ tabId, color: '#6e7781' });
+    await chrome.action.setBadgeText({ tabId, text: 'off' });
+    await chrome.action.setTitle({ tabId, title: 'Privacy Guard — protection paused' });
+    return;
+  }
   const signals = await getTab(tabId);
   if (!signals || !signals.origin) {
     await chrome.action.setBadgeText({ tabId, text: '' });
@@ -202,6 +251,10 @@ chrome.declarativeNetRequest.onRuleMatchedDebug?.addListener(async (info) => {
   signals.trackersBlocked += 1;
   const domain = hostOf(info.request.url);
   if (domain) signals.blocked[domain] = (signals.blocked[domain] ?? 0) + 1;
+  await updateStats((s) => {
+    s.trackersBlockedTotal += 1;
+    if (domain) s.topTrackers[domain] = (s.topTrackers[domain] ?? 0) + 1;
+  });
   await setTab(tabId, signals);
   await recordHistory(signals);
   await refreshBadge(tabId);
@@ -221,7 +274,10 @@ async function handle(
   switch (msg.type) {
     case 'get-config': {
       const [salt, settings] = await Promise.all([getSessionSalt(), getSettings()]);
-      const enabled = !isAllowlisted(settings, msg.origin) && settings.level !== 'off';
+      const enabled =
+        settings.enabled &&
+        !isAllowlisted(settings, msg.origin) &&
+        settings.level !== 'off';
       // Seed this tab's signal record if the navigation hook hasn't yet.
       const tabId = sender.tab?.id;
       if (typeof tabId === 'number' && !(await getTab(tabId))) {
@@ -241,11 +297,12 @@ async function handle(
       const tabId = sender.tab?.id;
       if (typeof tabId !== 'number') return { ok: false };
       const signals = (await getTab(tabId)) ?? freshSignals(sender.tab?.url ?? '');
-      // inject sends the absolute per-surface count → store the max we've seen.
-      signals.fpAttempts[msg.surface as FpSurface] = Math.max(
-        signals.fpAttempts[msg.surface as FpSurface],
-        msg.count
-      );
+      // inject sends the absolute per-surface count → store the max we've seen,
+      // and add the positive delta to the lifetime probe counter.
+      const prev = signals.fpAttempts[msg.surface as FpSurface];
+      const next = Math.max(prev, msg.count);
+      signals.fpAttempts[msg.surface as FpSurface] = next;
+      if (next > prev) await updateStats((s) => (s.fpProbesTotal += next - prev));
       await setTab(tabId, signals);
       await recordHistory(signals);
       await refreshBadge(tabId);
@@ -265,9 +322,17 @@ async function handle(
     case 'get-settings':
       return getSettings();
 
-    case 'set-settings':
+    case 'set-settings': {
       await setSettings(msg.settings);
+      await applyTrackerBlocking(msg.settings);
+      await syncDynamicRules(msg.settings);
+      // Reflect the (possibly paused) state on every open tab's badge.
+      const tabs = await chrome.tabs.query({});
+      await Promise.all(
+        tabs.map((t) => (typeof t.id === 'number' ? refreshBadge(t.id) : null))
+      );
       return { ok: true };
+    }
 
     case 'get-history': {
       const got = await chrome.storage.local.get(HISTORY_KEY);
@@ -277,6 +342,19 @@ async function handle(
 
     case 'clear-history':
       await chrome.storage.local.remove(HISTORY_KEY);
+      return { ok: true };
+
+    case 'get-stats': {
+      const [stats, historyObj] = await Promise.all([
+        getStats(),
+        chrome.storage.local.get(HISTORY_KEY),
+      ]);
+      const sitesProtected = Object.keys(historyObj[HISTORY_KEY] ?? {}).length;
+      return { ...stats, sitesProtected };
+    }
+
+    case 'clear-stats':
+      await chrome.storage.local.remove(STATS_KEY);
       return { ok: true };
 
     case 'set-tracker-exception': {

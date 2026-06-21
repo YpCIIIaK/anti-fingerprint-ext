@@ -25,11 +25,49 @@
       .g.C { background: var(--amber); }
       .g.D, .g.F { background: var(--red); }
       .legend-row { display: flex; justify-content: space-between; align-items: center; }
+      .cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 16px; }
+      .card { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 14px; border-left-width: 4px; }
+      .card--red { border-left-color: var(--red); }
+      .card--amber { border-left-color: var(--amber); }
+      .card--green { border-left-color: var(--green); }
+      .card-num { font-size: 26px; font-weight: 800; font-variant-numeric: tabular-nums; }
+      .card-label { color: var(--muted); font-size: 11px; margin-top: 2px; }
+      .since { color: var(--muted); font-size: 11px; margin-bottom: 8px; }
+      .bars { list-style: none; margin: 0; padding: 0; }
+      .bars li { margin: 6px 0; }
+      .bars .row { display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 2px; }
+      .bars .name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 340px; }
+      .bars .track { background: var(--border); border-radius: 4px; height: 6px; overflow: hidden; }
+      .bars .fill { background: var(--red); height: 100%; }
     </style>
   </head>
   <body>
     <h1>Privacy Guard</h1>
     <p class="sub">Anti-fingerprint protection &amp; per-site Privacy Score.</p>
+
+    <div class="cards">
+      <div class="card card--red">
+        <div class="card-num" id="stTrackers">0</div>
+        <div class="card-label">Trackers blocked</div>
+      </div>
+      <div class="card card--amber">
+        <div class="card-num" id="stProbes">0</div>
+        <div class="card-label">Fingerprint probes stopped</div>
+      </div>
+      <div class="card card--green">
+        <div class="card-num" id="stSites">0</div>
+        <div class="card-label">Sites protected</div>
+      </div>
+    </div>
+
+    <fieldset>
+      <legend class="legend-row">
+        <span>Top blocked trackers</span>
+        <button id="clearStats" class="ghost">Reset stats</button>
+      </legend>
+      <div class="since" id="stSince"></div>
+      <ul id="topTrackers" class="bars"></ul>
+    </fieldset>
 
     <fieldset>
       <legend>Default protection level</legend>

@@ -22,7 +22,13 @@ header {
   align-items: baseline;
   padding: 12px 14px 8px;
 }
+.brand-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; width: 100%; }
 .brand { font-weight: 700; }
+.switch.master { width: 40px; height: 22px; }
+.switch.master .slider::before { height: 16px; width: 16px; }
+.switch.master input:checked + .slider::before { transform: translateX(18px); }
+.paused-banner { background: #6e7781; color: #fff; font-size: 12px; padding: 6px 14px; }
+.dimmed { opacity: .45; pointer-events: none; }
 .origin { color: var(--muted); font-size: 11px; max-width: 170px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 .score {
@@ -42,6 +48,11 @@ header {
 .grade--na { background: var(--border); color: var(--muted); }
 .score-num { font-size: 22px; font-weight: 700; }
 .score-label { color: var(--muted); font-size: 11px; }
+
+.chips { display: flex; gap: 8px; padding: 0 14px 12px; }
+.chip { flex: 1; background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 8px; text-align: center; }
+.chip-num { display: block; font-size: 18px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.chip-label { color: var(--muted); font-size: 10px; text-transform: uppercase; letter-spacing: .03em; }
 
 .controls {
   display: flex; align-items: center; gap: 8px;

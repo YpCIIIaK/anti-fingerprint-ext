@@ -106,6 +106,28 @@ async function render(): Promise<void> {
     $('scoreNum').textContent = '—';
   }
 
+  // Master switch + paused state
+  ($('masterToggle') as HTMLInputElement).checked = settings.enabled;
+  $('pausedBanner').hidden = settings.enabled;
+  // Dim the score/breakdown/blocked panels while globally paused.
+  for (const sel of ['.score', '.breakdown', '.blocked']) {
+    document.querySelector(sel)?.classList.toggle('dimmed', !settings.enabled);
+  }
+
+  // Per-page stat chips
+  if (state) {
+    const fp = state.signals.fpAttempts;
+    const probes = fp.canvas + fp.webgl + fp.audio + fp.navigator + fp.screen + fp.fonts;
+    $('chProbes').textContent = String(probes);
+    $('chBlocked').textContent = String(state.signals.trackersBlocked);
+    $('chHttps').textContent = state.signals.isHttps ? 'HTTPS' : 'HTTP';
+    $('chHttps').style.color = state.signals.isHttps ? 'var(--green)' : 'var(--red)';
+  } else {
+    $('chProbes').textContent = '0';
+    $('chBlocked').textContent = '0';
+    $('chHttps').textContent = '—';
+  }
+
   // Controls
   ($('level') as HTMLSelectElement).value = settings.level;
   const allowed = origin ? settings.allowlist.includes(origin) : false;
@@ -139,6 +161,17 @@ async function render(): Promise<void> {
 }
 
 // ---- wiring --------------------------------------------------------------
+
+$('masterToggle').addEventListener('change', async (e) => {
+  const enabled = (e.target as HTMLInputElement).checked;
+  const settings = (await chrome.runtime.sendMessage({
+    type: 'get-settings',
+  })) as Settings;
+  settings.enabled = enabled;
+  await chrome.runtime.sendMessage({ type: 'set-settings', settings });
+  await chrome.tabs.reload();
+  window.close();
+});
 
 $('level').addEventListener('change', async (e) => {
   const level = (e.target as HTMLSelectElement).value as Settings['level'];
