@@ -12,17 +12,34 @@ export interface ScoreResult {
   breakdown: ScoreBreakdownItem[];
 }
 
-// Weights are intentionally in one place so the scoring policy is auditable.
-const WEIGHTS = {
-  canvasPerAttempt: 8,
-  webglPerAttempt: 8,
-  audioPerAttempt: 6,
-  otherFpPerAttempt: 3,
-  fingerprintCap: 45, // total fingerprint penalty is capped
-  noHttps: 20,
-  trackerCleared: 4, // small credit removed per blocked tracker is *good*, so we
-  // instead penalise presence of tracking attempts indirectly via attempts above.
+// Per-surface penalty model. Each surface scores on *presence* (a base hit the
+// first time it's probed) plus a small diminishing bump for repeated probes
+// (log2, so 50 calls ≈ 5×). Each surface is capped, so a single chatty-but-benign
+// surface (e.g. fonts/screen) can't tank the score the way raw per-call counting
+// did. High-entropy surfaces (canvas/webgl/audio) carry the real weight.
+interface SurfaceWeight {
+  base: number;
+  slope: number;
+  cap: number;
+}
+const SURFACE: Record<string, SurfaceWeight> = {
+  canvas: { base: 12, slope: 4, cap: 22 },
+  webgl: { base: 12, slope: 2, cap: 18 },
+  audio: { base: 10, slope: 3, cap: 18 },
+  navigator: { base: 3, slope: 1, cap: 6 },
+  screen: { base: 2, slope: 0, cap: 2 },
+  fonts: { base: 8, slope: 2, cap: 14 },
 };
+const WEIGHTS = {
+  fingerprintCap: 60, // total fingerprint penalty is capped
+  noHttps: 20,
+};
+
+function surfacePenalty(surface: string, count: number): number {
+  if (count <= 0) return 0;
+  const w = SURFACE[surface];
+  return Math.min(w.cap, w.base + w.slope * Math.log2(count + 1));
+}
 
 function gradeFor(score: number): ScoreResult['grade'] {
   if (score >= 90) return 'A';
@@ -43,27 +60,23 @@ export function computeScore(s: TabSignals): ScoreResult {
   let score = 100;
 
   const fp = s.fpAttempts;
-  let fpPenalty =
-    fp.canvas * WEIGHTS.canvasPerAttempt +
-    fp.webgl * WEIGHTS.webglPerAttempt +
-    fp.audio * WEIGHTS.audioPerAttempt +
-    (fp.navigator + fp.screen + fp.fonts) * WEIGHTS.otherFpPerAttempt;
-  fpPenalty = Math.min(fpPenalty, WEIGHTS.fingerprintCap);
+  const parts = [
+    ['canvas', fp.canvas],
+    ['webgl', fp.webgl],
+    ['audio', fp.audio],
+    ['navigator', fp.navigator],
+    ['screen', fp.screen],
+    ['fonts', fp.fonts],
+  ] as const;
 
-  const totalFp =
-    fp.canvas + fp.webgl + fp.audio + fp.navigator + fp.screen + fp.fonts;
+  let fpPenalty = 0;
+  for (const [surface, count] of parts) fpPenalty += surfacePenalty(surface, count);
+  fpPenalty = Math.min(Math.round(fpPenalty), WEIGHTS.fingerprintCap);
+
+  const totalFp = parts.reduce((n, [, c]) => n + c, 0);
   if (fpPenalty > 0) {
     score -= fpPenalty;
-    // Spell out every surface so "other" is never a mystery: e.g. heavy
-    // measureText() use shows up explicitly as a high `fonts` count.
-    const parts = [
-      ['canvas', fp.canvas],
-      ['webgl', fp.webgl],
-      ['audio', fp.audio],
-      ['navigator', fp.navigator],
-      ['screen', fp.screen],
-      ['fonts', fp.fonts],
-    ] as const;
+    // Spell out every surface so "other" is never a mystery.
     const detail = parts
       .filter(([, n]) => n > 0)
       .map(([k, n]) => `${k} ${n}`)

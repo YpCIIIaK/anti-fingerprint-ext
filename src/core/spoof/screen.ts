@@ -10,15 +10,28 @@ export function installScreen(ctx: SpoofCtx): void {
   if (!ctx.isEnabled()) return;
 
   const round = (v: number) => Math.round(v / 100) * 100;
-  const probe = <T>(v: T): T => {
-    ctx.report('screen');
-    return v;
-  };
+  let reported = false;
 
   try {
     const s = window.screen;
-    defineValue(s, 'width', probe(round(s.width)));
-    defineValue(s, 'height', probe(round(s.height)));
+    // width/height are the high-entropy reads → count a probe lazily, once, only
+    // if the page actually accesses them (reading screen size is near-universal,
+    // so eager/repeated counting would be a false positive).
+    for (const prop of ['width', 'height'] as const) {
+      const value = round(s[prop]);
+      Object.defineProperty(s, prop, {
+        get() {
+          if (!reported) {
+            reported = true;
+            ctx.report('screen');
+          }
+          return value;
+        },
+        configurable: true,
+        enumerable: true,
+      });
+    }
+    // The rest are normalised silently (low entropy, not worth flagging).
     defineValue(s, 'availWidth', round(s.availWidth));
     defineValue(s, 'availHeight', round(s.availHeight));
     defineValue(s, 'availLeft', 0);
