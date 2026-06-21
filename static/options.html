@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="stylesheet" href="popup.css" />
+    <title>Privacy Guard — Options</title>
+    <style>
+      body { width: 520px; padding: 16px; }
+      h1 { font-size: 18px; margin: 0 0 4px; }
+      .sub { color: var(--muted); margin: 0 0 16px; }
+      fieldset { border: 1px solid var(--border); border-radius: 8px; margin: 0 0 16px; padding: 12px; }
+      legend { padding: 0 6px; color: var(--muted); }
+      .row { display: flex; gap: 8px; margin: 6px 0; }
+      input[type="text"] { flex: 1; background: var(--panel); color: var(--text); border: 1px solid var(--border); border-radius: 6px; padding: 6px 8px; }
+      #allowlist { list-style: none; margin: 8px 0 0; padding: 0; }
+      #allowlist li { display: flex; justify-content: space-between; align-items: center; padding: 6px 0; border-bottom: 1px dashed var(--border); }
+      #allowlist button { background: transparent; color: var(--red); border: 0; cursor: pointer; }
+      table { border-collapse: collapse; width: 100%; margin-top: 8px; }
+      th, td { border-bottom: 1px solid var(--border); padding: 6px 8px; text-align: left; font-size: 12px; }
+      th { color: var(--muted); font-weight: 600; }
+      td.origin { max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      .g { display: inline-block; min-width: 18px; text-align: center; border-radius: 4px; padding: 1px 5px; color: #fff; font-weight: 700; }
+      .g.A, .g.B { background: var(--green); }
+      .g.C { background: var(--amber); }
+      .g.D, .g.F { background: var(--red); }
+      .legend-row { display: flex; justify-content: space-between; align-items: center; }
+    </style>
+  </head>
+  <body>
+    <h1>Privacy Guard</h1>
+    <p class="sub">Anti-fingerprint protection &amp; per-site Privacy Score.</p>
+
+    <fieldset>
+      <legend>Default protection level</legend>
+      <select id="level">
+        <option value="off">Off — no spoofing</option>
+        <option value="balanced">Balanced — recommended</option>
+        <option value="strict">Strict — maximum noise</option>
+      </select>
+    </fieldset>
+
+    <fieldset>
+      <legend>Allowlist (spoofing disabled)</legend>
+      <div class="row">
+        <input id="newOrigin" type="text" placeholder="https://example.com" />
+        <button id="add" class="ghost">Add</button>
+      </div>
+      <ul id="allowlist"></ul>
+    </fieldset>
+
+    <fieldset>
+      <legend class="legend-row">
+        <span>Per-site history</span>
+        <button id="clearHistory" class="ghost">Clear</button>
+      </legend>
+      <table>
+        <thead>
+          <tr><th>Site</th><th>Grade</th><th>Score</th><th>Trackers</th><th>FP probes</th><th>Visits</th></tr>
+        </thead>
+        <tbody id="history"></tbody>
+      </table>
+    </fieldset>
+
+    <script src="options.js"></script>
+  </body>
+</html>

@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="stylesheet" href="popup.css" />
+    <title>Privacy Guard</title>
+  </head>
+  <body>
+    <header>
+      <div class="brand">Privacy Guard</div>
+      <div id="origin" class="origin">—</div>
+    </header>
+
+    <section class="score">
+      <div id="grade" class="grade grade--na">–</div>
+      <div class="score-meta">
+        <div id="scoreNum" class="score-num">—</div>
+        <div class="score-label">Privacy Score</div>
+      </div>
+    </section>
+
+    <section class="controls">
+      <label for="level">Protection</label>
+      <select id="level">
+        <option value="off">Off</option>
+        <option value="balanced">Balanced</option>
+        <option value="strict">Strict</option>
+      </select>
+      <button id="allowToggle" class="ghost">Allowlist this site</button>
+    </section>
+
+    <section class="breakdown">
+      <h3>Breakdown</h3>
+      <ul id="breakdown"></ul>
+    </section>
+
+    <section class="blocked">
+      <h3>Blocked on this site</h3>
+      <p class="hint">Toggle off anything that breaks the page — it’ll be allowed only here.</p>
+      <ul id="blocked"></ul>
+    </section>
+
+    <footer>
+      <a id="openOptions" href="#">Options & allowlist →</a>
+    </footer>
+
+    <script src="popup.js"></script>
+  </body>
+</html>

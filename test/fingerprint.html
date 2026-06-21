@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Privacy Guard — fingerprint test</title>
+    <style>
+      body { font: 14px/1.5 system-ui, sans-serif; max-width: 720px; margin: 40px auto; padding: 0 16px; }
+      h1 { font-size: 20px; }
+      table { border-collapse: collapse; width: 100%; }
+      td, th { border: 1px solid #ccc; padding: 6px 10px; text-align: left; vertical-align: top; }
+      th { background: #f4f4f4; }
+      code { font-family: ui-monospace, monospace; word-break: break-all; }
+      .hash { color: #0a5; font-weight: 700; }
+    </style>
+  </head>
+  <body>
+    <h1>Privacy Guard — fingerprint test</h1>
+    <p>
+      Run with the extension <b>off</b>, note the hashes, then turn it <b>on</b>
+      and reload. With protection on: canvas/webgl/audio hashes should
+      <i>change vs the unprotected run</i>, but stay <i>stable across reloads in
+      the same session</i> (deterministic-per-origin). The toolbar badge should
+      show a degraded grade as probes are counted.
+    </p>
+    <table id="out"></table>
+
+    <script>
+      const rows = [];
+      function add(name, value) {
+        rows.push([name, value]);
+        render();
+      }
+      function render() {
+        document.getElementById('out').innerHTML =
+          '<tr><th>Surface</th><th>Value / hash</th></tr>' +
+          rows
+            .map(
+              ([n, v]) =>
+                `<tr><td>${n}</td><td><code class="hash">${v}</code></td></tr>`
+            )
+            .join('');
+      }
+      async function sha(buf) {
+        const d = await crypto.subtle.digest('SHA-256', buf);
+        return Array.from(new Uint8Array(d))
+          .map((b) => b.toString(16).padStart(2, '0'))
+          .join('')
+          .slice(0, 24);
+      }
+
+      // Canvas
+      (async () => {
+        const c = document.createElement('canvas');
+        c.width = 240; c.height = 60;
+        const ctx = c.getContext('2d');
+        ctx.textBaseline = 'top';
+        ctx.font = '16px Arial';
+        ctx.fillStyle = '#069';
+        ctx.fillText('Privacy Guard 🛡 fingerprint', 4, 8);
+        ctx.fillStyle = 'rgba(255,0,255,0.6)';
+        ctx.fillRect(10, 10, 100, 30);
+        const url = c.toDataURL();
+        add('Canvas toDataURL', await sha(new TextEncoder().encode(url)));
+        const img = ctx.getImageData(0, 0, c.width, c.height);
+        add('Canvas getImageData', await sha(img.data.buffer));
+      })();
+
+      // WebGL
+      (() => {
+        const c = document.createElement('canvas');
+        const gl = c.getContext('webgl');
+        const ext = gl && gl.getExtension('WEBGL_debug_renderer_info');
+        if (ext) {
+          add('WebGL renderer', gl.getParameter(ext.UNMASKED_RENDERER_WEBGL));
+          add('WebGL vendor', gl.getParameter(ext.UNMASKED_VENDOR_WEBGL));
+        }
+      })();
+
+      // Audio
+      (async () => {
+        try {
+          const Ctx = window.OfflineAudioContext || window.webkitOfflineAudioContext;
+          const ac = new Ctx(1, 5000, 44100);
+          const osc = ac.createOscillator();
+          osc.type = 'triangle';
+          osc.frequency.value = 1000;
+          const comp = ac.createDynamicsCompressor();
+          osc.connect(comp); comp.connect(ac.destination);
+          osc.start(0);
+          const buf = await ac.startRendering();
+          add('Audio sample', await sha(buf.getChannelData(0).buffer));
+        } catch (e) { add('Audio', 'unavailable'); }
+      })();
+
+      // navigator / screen
+      add('hardwareConcurrency', navigator.hardwareConcurrency);
+      add('deviceMemory', navigator.deviceMemory);
+      add('languages', JSON.stringify(navigator.languages));
+      add('screen', `${screen.width}x${screen.height} (avail ${screen.availWidth}x${screen.availHeight})`);
+    </script>
+  </body>
+</html>
