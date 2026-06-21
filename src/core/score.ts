@@ -54,10 +54,24 @@ export function computeScore(s: TabSignals): ScoreResult {
     fp.canvas + fp.webgl + fp.audio + fp.navigator + fp.screen + fp.fonts;
   if (fpPenalty > 0) {
     score -= fpPenalty;
+    // Spell out every surface so "other" is never a mystery: e.g. heavy
+    // measureText() use shows up explicitly as a high `fonts` count.
+    const parts = [
+      ['canvas', fp.canvas],
+      ['webgl', fp.webgl],
+      ['audio', fp.audio],
+      ['navigator', fp.navigator],
+      ['screen', fp.screen],
+      ['fonts', fp.fonts],
+    ] as const;
+    const detail = parts
+      .filter(([, n]) => n > 0)
+      .map(([k, n]) => `${k} ${n}`)
+      .join(', ');
     breakdown.push({
       label: 'Fingerprinting attempts',
       penalty: fpPenalty,
-      detail: `${totalFp} probe(s): canvas ${fp.canvas}, webgl ${fp.webgl}, audio ${fp.audio}, other ${fp.navigator + fp.screen + fp.fonts}`,
+      detail: `${totalFp} probe(s): ${detail}`,
     });
   }
 
